@@ -1,0 +1,27 @@
+.DS_Store
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.ipynb_checkpoints/
+
+# Virtual environments
+venv/
+.env/
+
+# MLflow
+mlruns/
+
+# DVC local cache
+.dvc/cache/
+
+# Data folders (tracked by DVC, not by Git)
+data/raw/
+data/processed/
+
+# Model artifacts (logged in MLflow)
+models/
+
+# Plots
+*.png
