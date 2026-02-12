@@ -6,7 +6,10 @@ from fastapi import FastAPI, UploadFile, File
 from PIL import Image
 import torchvision.transforms as T
 
-# ---------- model definition (same as training) ----------
+
+# ----------------------------
+# Model definition
+# ----------------------------
 
 class SimpleCNN(nn.Module):
     def __init__(self):
@@ -27,33 +30,64 @@ class SimpleCNN(nn.Module):
     def forward(self, x):
         return self.net(x)
 
-# ---------- load model ----------
+
+# ----------------------------
+# Lazy model loading
+# ----------------------------
 
 MODEL_PATH = os.getenv("MODEL_PATH", "models/baseline_cnn.pt")
-
 device = torch.device("cpu")
 
-model = SimpleCNN()
-model.load_state_dict(torch.load(MODEL_PATH, map_location=device))
-model.eval()
+_model = None
 
-# ---------- preprocessing ----------
+
+def get_model():
+    global _model
+
+    if _model is None:
+        m = SimpleCNN()
+        m.load_state_dict(torch.load(MODEL_PATH, map_location=device))
+        m.eval()
+        _model = m
+
+    return _model
+
+
+# ----------------------------
+# Prediction utility
+# ----------------------------
+
+def predict_tensor(model, x):
+    with torch.no_grad():
+        logits = model(x)
+        prob = torch.sigmoid(logits).item()
+
+    label = "dog" if prob >= 0.5 else "cat"
+    return prob, label
+
+
+# ----------------------------
+# Preprocessing
+# ----------------------------
 
 transform = T.Compose([
     T.Resize((224, 224)),
     T.ToTensor()
 ])
 
-# ---------- FastAPI app ----------
+
+# ----------------------------
+# FastAPI app
+# ----------------------------
 
 app = FastAPI(title="Cats vs Dogs Inference API")
 
-# health check
+
 @app.get("/health")
 def health():
     return {"status": "ok"}
 
-# prediction endpoint
+
 @app.post("/predict")
 async def predict(file: UploadFile = File(...)):
 
@@ -62,17 +96,10 @@ async def predict(file: UploadFile = File(...)):
 
     x = transform(image).unsqueeze(0)
 
+    model = get_model()
     prob, label = predict_tensor(model, x)
 
     return {
         "probability_dog": prob,
         "predicted_label": label
     }
-
-def predict_tensor(model, x):
-    import torch
-    with torch.no_grad():
-        logits = model(x)
-        prob = torch.sigmoid(logits).item()
-    label = "dog" if prob >= 0.5 else "cat"
-    return prob, label
