@@ -62,13 +62,17 @@ async def predict(file: UploadFile = File(...)):
 
     x = transform(image).unsqueeze(0)
 
-    with torch.no_grad():
-        logits = model(x)
-        prob = torch.sigmoid(logits).item()
-
-    label = "dog" if prob >= 0.5 else "cat"
+    prob, label = predict_tensor(model, x)
 
     return {
         "probability_dog": prob,
         "predicted_label": label
     }
+
+def predict_tensor(model, x):
+    import torch
+    with torch.no_grad():
+        logits = model(x)
+        prob = torch.sigmoid(logits).item()
+    label = "dog" if prob >= 0.5 else "cat"
+    return prob, label
