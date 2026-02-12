@@ -8,6 +8,10 @@ on:
 jobs:
   test-and-build:
 
+    defaults:
+        run:
+          working-directory: cats-dogs-mlops
+
     runs-on: ubuntu-latest
 
     steps:
