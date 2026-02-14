@@ -20,8 +20,5 @@ mlruns/
 data/raw/
 data/processed/
 
-# Model artifacts (logged in MLflow)
-models/
-
 # Plots
 *.png

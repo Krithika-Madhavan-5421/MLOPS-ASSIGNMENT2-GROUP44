@@ -1,0 +1,9 @@
+version: "3.8"
+
+services:
+  cats-dogs-api:
+    image: kiki4170/cats-dogs-inference:latest
+    container_name: cats-dogs-api
+    ports:
+      - "8000:8000"
+    restart: always
