@@ -5,6 +5,21 @@ import torch.nn as nn
 from fastapi import FastAPI, UploadFile, File
 from PIL import Image
 import torchvision.transforms as T
+import logging
+import time
+from collections import defaultdict
+
+# ----------------------------
+# Logging
+# ----------------------------
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s"
+)
+
+logger = logging.getLogger(__name__)
+
 
 
 # ----------------------------
@@ -37,6 +52,12 @@ class SimpleCNN(nn.Module):
 
 MODEL_PATH = os.getenv("MODEL_PATH", "models/baseline_cnn.pt")
 device = torch.device("cpu")
+
+request_metrics = {
+    "total_requests": 0,
+    "total_latency": 0.0
+}
+
 
 _model = None
 
@@ -91,15 +112,49 @@ def health():
 @app.post("/predict")
 async def predict(file: UploadFile = File(...)):
 
-    image_bytes = await file.read()
-    image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
+    start_time = time.time()
 
-    x = transform(image).unsqueeze(0)
+    request_metrics["total_requests"] += 1
 
-    model = get_model()
-    prob, label = predict_tensor(model, x)
+    try:
+        image_bytes = await file.read()
+        image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
+
+        x = transform(image).unsqueeze(0)
+
+        model = get_model()
+        prob, label = predict_tensor(model, x)
+
+        latency = time.time() - start_time
+        request_metrics["total_latency"] += latency
+
+        logger.info(
+            f"Prediction made | label={label} | prob={prob:.4f} | latency={latency:.4f}s"
+        )
+
+        return {
+            "probability_dog": prob,
+            "predicted_label": label,
+            "latency_seconds": latency
+        }
+
+    except Exception as e:
+        logger.error(f"Prediction error: {str(e)}")
+        raise
+
+
+@app.get("/metrics")
+def metrics():
+
+    total = request_metrics["total_requests"]
+
+    avg_latency = (
+        request_metrics["total_latency"] / total
+        if total > 0 else 0
+    )
 
     return {
-        "probability_dog": prob,
-        "predicted_label": label
+        "total_requests": total,
+        "average_latency_seconds": avg_latency
     }
+
