@@ -8,25 +8,30 @@ on:
 
 jobs:
   deploy:
-
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
-
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
 
+      - name: Pull latest Docker image
+        run: docker pull kiki4170/cats-dogs-inference:latest
+
       - name: Start service using Docker Compose
-        run: |
-          docker compose up -d
+        run: docker compose up -d --force-recreate
 
       - name: Wait for service
         run: sleep 15
 
+      - name: Show running containers
+        run: docker ps
+
+      - name: Show container logs
+        run: docker logs cats-dogs-api
+
       - name: Smoke test - health endpoint
-        run: |
-          curl --fail http://localhost:8000/health
+        run: curl --fail http://localhost:8000/health
 
       - name: Smoke test - prediction endpoint
         run: |
