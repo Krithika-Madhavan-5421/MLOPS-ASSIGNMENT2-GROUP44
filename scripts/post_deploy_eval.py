@@ -1,39 +1,63 @@
 import requests
 import os
-from sklearn.metrics import accuracy_score
 import sys
+from sklearn.metrics import accuracy_score
 
 API_URL = "http://localhost:8000/predict"
-TEST_FOLDER = "data/tests"
+TEST_ROOT = "data/tests"
+THRESHOLD = 0.6   # Fail monitoring if below this
+
 
 true_labels = []
 pred_labels = []
 
-for filename in os.listdir(TEST_FOLDER):
+# Loop through class folders
+for class_name in ["cats", "dogs"]:
 
-    if filename.lower().endswith(".jpg"):
+    class_folder = os.path.join(TEST_ROOT, class_name)
 
-        # assumes filename contains class name
-        label = "dog" if "dog" in filename.lower() else "cat"
-        true_labels.append(label)
+    if not os.path.exists(class_folder):
+        print(f"Missing folder: {class_folder}")
+        sys.exit(1)
 
-        with open(os.path.join(TEST_FOLDER, filename), "rb") as f:
-            response = requests.post(API_URL, files={"file": f})
+    for filename in os.listdir(class_folder):
 
-        if response.status_code != 200:
-            print("Prediction request failed")
-            sys.exit(1)
+        if filename.lower().endswith((".jpg", ".jpeg", ".png")):
 
-        pred = response.json()["predicted_label"]
-        pred_labels.append(pred)
+            true_label = "cat" if class_name == "cats" else "dog"
+            true_labels.append(true_label)
+
+            file_path = os.path.join(class_folder, filename)
+
+            try:
+                with open(file_path, "rb") as f:
+                    response = requests.post(API_URL, files={"file": f})
+
+                if response.status_code != 200:
+                    print(f"Request failed for {filename}")
+                    sys.exit(1)
+
+                pred = response.json()["predicted_label"]
+                pred_labels.append(pred)
+
+                print(f"{filename} | True: {true_label} | Pred: {pred}")
+
+            except Exception as e:
+                print(f"Error processing {filename}: {e}")
+                sys.exit(1)
+
+
+if len(true_labels) == 0:
+    print("No test images found.")
+    sys.exit(1)
 
 accuracy = accuracy_score(true_labels, pred_labels)
 
-print("Post-deployment accuracy:", accuracy)
+print("\nPost-deployment accuracy:", accuracy)
 
-# Fail pipeline if accuracy too low
-THRESHOLD = 0.6
-
+# Fail monitoring pipeline if performance drops
 if accuracy < THRESHOLD:
     print("Accuracy below threshold!")
     sys.exit(1)
+
+print("Monitoring check passed.")
