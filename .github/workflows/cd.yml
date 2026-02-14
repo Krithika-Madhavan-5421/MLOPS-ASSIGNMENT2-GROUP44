@@ -30,6 +30,9 @@ jobs:
       - name: Show container logs
         run: docker logs cats-dogs-api
 
+      - name: Verify sample image exists
+        run: ls -lh data/tests/
+
       - name: Smoke test - health endpoint
         run: curl --fail http://localhost:8000/health
 
