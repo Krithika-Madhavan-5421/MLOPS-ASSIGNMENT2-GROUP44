@@ -20,7 +20,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # ----------------------------
-# Improved SimpleCNN (MUST match train.py)
+# Small Improved SimpleCNN (MATCHES TRAIN.PY)
 # ----------------------------
 
 class SimpleCNN(nn.Module):
@@ -44,16 +44,20 @@ class SimpleCNN(nn.Module):
             nn.MaxPool2d(2),
         )
 
+        # 🔥 Global Average Pooling
+        self.global_pool = nn.AdaptiveAvgPool2d((1, 1))
+
         self.classifier = nn.Sequential(
             nn.Flatten(),
-            nn.Linear(128 * 28 * 28, 512),
+            nn.Linear(128, 64),
             nn.ReLU(),
             nn.Dropout(0.5),
-            nn.Linear(512, 1)
+            nn.Linear(64, 1)
         )
 
     def forward(self, x):
         x = self.features(x)
+        x = self.global_pool(x)
         x = self.classifier(x)
         return x
 
@@ -99,7 +103,7 @@ def predict_tensor(model, x):
     return prob, label
 
 # ----------------------------
-# Preprocessing (must match training)
+# Preprocessing (MUST match train.py)
 # ----------------------------
 
 transform = T.Compose([

@@ -15,7 +15,7 @@ import os
 DATA_DIR = "data/processed"
 
 # ----------------------------
-# Transforms (Improved)
+# Transforms
 # ----------------------------
 
 transform_train = T.Compose([
@@ -39,7 +39,7 @@ train_loader = DataLoader(train_ds, batch_size=32, shuffle=True)
 val_loader   = DataLoader(val_ds, batch_size=32)
 
 # ----------------------------
-# Improved SimpleCNN
+# Improved SimpleCNN (SMALL VERSION)
 # ----------------------------
 
 class SimpleCNN(nn.Module):
@@ -63,22 +63,25 @@ class SimpleCNN(nn.Module):
             nn.MaxPool2d(2),
         )
 
+        # 🔥 Global Average Pooling (reduces parameters massively)
+        self.global_pool = nn.AdaptiveAvgPool2d((1, 1))
+
         self.classifier = nn.Sequential(
             nn.Flatten(),
-            nn.Linear(128 * 28 * 28, 512),
+            nn.Linear(128, 64),
             nn.ReLU(),
             nn.Dropout(0.5),
-            nn.Linear(512, 1)
+            nn.Linear(64, 1)
         )
 
     def forward(self, x):
         x = self.features(x)
+        x = self.global_pool(x)
         x = self.classifier(x)
         return x
 
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
 model = SimpleCNN().to(device)
 
 criterion = nn.BCEWithLogitsLoss()
@@ -103,7 +106,7 @@ mlflow.set_experiment("cats_vs_dogs_finetuned_simplecnn")
 
 with mlflow.start_run():
 
-    mlflow.log_param("model", "ImprovedSimpleCNN")
+    mlflow.log_param("model", "ImprovedSimpleCNN_Small")
     mlflow.log_param("batch_size", 32)
     mlflow.log_param("lr", 1e-4)
     mlflow.log_param("epochs", 8)
