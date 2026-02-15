@@ -7,7 +7,6 @@ from PIL import Image
 import torchvision.transforms as T
 import logging
 import time
-from collections import defaultdict
 
 # ----------------------------
 # Logging
@@ -20,62 +19,75 @@ logging.basicConfig(
 
 logger = logging.getLogger(__name__)
 
-
-
 # ----------------------------
-# Model definition
+# Improved SimpleCNN (MUST match train.py)
 # ----------------------------
 
 class SimpleCNN(nn.Module):
     def __init__(self):
         super().__init__()
-        self.net = nn.Sequential(
-            nn.Conv2d(3, 32, 3, padding=1), nn.ReLU(),
-            nn.MaxPool2d(2),
-            nn.Conv2d(32, 64, 3, padding=1), nn.ReLU(),
-            nn.MaxPool2d(2),
-            nn.Conv2d(64, 128, 3, padding=1), nn.ReLU(),
-            nn.MaxPool2d(2),
-            nn.Flatten(),
-            nn.Linear(128 * 28 * 28, 256),
+
+        self.features = nn.Sequential(
+            nn.Conv2d(3, 32, 3, padding=1),
+            nn.BatchNorm2d(32),
             nn.ReLU(),
-            nn.Linear(256, 1)
+            nn.MaxPool2d(2),
+
+            nn.Conv2d(32, 64, 3, padding=1),
+            nn.BatchNorm2d(64),
+            nn.ReLU(),
+            nn.MaxPool2d(2),
+
+            nn.Conv2d(64, 128, 3, padding=1),
+            nn.BatchNorm2d(128),
+            nn.ReLU(),
+            nn.MaxPool2d(2),
+        )
+
+        self.classifier = nn.Sequential(
+            nn.Flatten(),
+            nn.Linear(128 * 28 * 28, 512),
+            nn.ReLU(),
+            nn.Dropout(0.5),
+            nn.Linear(512, 1)
         )
 
     def forward(self, x):
-        return self.net(x)
-
+        x = self.features(x)
+        x = self.classifier(x)
+        return x
 
 # ----------------------------
-# Lazy model loading
+# Lazy Model Loading
 # ----------------------------
 
 MODEL_PATH = os.getenv("MODEL_PATH", "models/baseline_cnn.pt")
 device = torch.device("cpu")
+
+_model = None
+
+def get_model():
+    global _model
+
+    if _model is None:
+        model = SimpleCNN()
+        model.load_state_dict(torch.load(MODEL_PATH, map_location=device))
+        model.eval()
+        _model = model
+
+    return _model
+
+# ----------------------------
+# Monitoring Metrics
+# ----------------------------
 
 request_metrics = {
     "total_requests": 0,
     "total_latency": 0.0
 }
 
-
-_model = None
-
-
-def get_model():
-    global _model
-
-    if _model is None:
-        m = SimpleCNN()
-        m.load_state_dict(torch.load(MODEL_PATH, map_location=device))
-        m.eval()
-        _model = m
-
-    return _model
-
-
 # ----------------------------
-# Prediction utility
+# Prediction Utility
 # ----------------------------
 
 def predict_tensor(model, x):
@@ -86,34 +98,30 @@ def predict_tensor(model, x):
     label = "dog" if prob >= 0.5 else "cat"
     return prob, label
 
-
 # ----------------------------
-# Preprocessing
+# Preprocessing (must match training)
 # ----------------------------
 
 transform = T.Compose([
     T.Resize((224, 224)),
-    T.ToTensor()
+    T.ToTensor(),
+    T.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5])
 ])
 
-
 # ----------------------------
-# FastAPI app
+# FastAPI App
 # ----------------------------
 
 app = FastAPI(title="Cats vs Dogs Inference API")
-
 
 @app.get("/health")
 def health():
     return {"status": "ok"}
 
-
 @app.post("/predict")
 async def predict(file: UploadFile = File(...)):
 
     start_time = time.time()
-
     request_metrics["total_requests"] += 1
 
     try:
@@ -142,7 +150,6 @@ async def predict(file: UploadFile = File(...)):
         logger.error(f"Prediction error: {str(e)}")
         raise
 
-
 @app.get("/metrics")
 def metrics():
 
@@ -157,4 +164,3 @@ def metrics():
         "total_requests": total,
         "average_latency_seconds": avg_latency
     }
-
