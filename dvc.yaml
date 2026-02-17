@@ -12,5 +12,3 @@ stages:
     deps:
       - src/train.py
       - data/processed
-    outs:
-      - models/baseline_cnn.pt

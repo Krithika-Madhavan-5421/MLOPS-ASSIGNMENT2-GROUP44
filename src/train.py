@@ -15,19 +15,18 @@ import os
 DATA_DIR = "data/processed"
 
 # ----------------------------
-# Transforms
+# Faster Transforms (128x128)
 # ----------------------------
 
 transform_train = T.Compose([
-    T.Resize((224, 224)),
+    T.Resize((128, 128)),
     T.RandomHorizontalFlip(),
-    T.RandomRotation(10),
     T.ToTensor(),
     T.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5])
 ])
 
 transform_val = T.Compose([
-    T.Resize((224, 224)),
+    T.Resize((128, 128)),
     T.ToTensor(),
     T.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5])
 ])
@@ -35,11 +34,21 @@ transform_val = T.Compose([
 train_ds = ImageFolder(f"{DATA_DIR}/train", transform=transform_train)
 val_ds   = ImageFolder(f"{DATA_DIR}/val", transform=transform_val)
 
-train_loader = DataLoader(train_ds, batch_size=32, shuffle=True)
-val_loader   = DataLoader(val_ds, batch_size=32)
+train_loader = DataLoader(
+    train_ds,
+    batch_size=64,
+    shuffle=True,
+    num_workers=2
+)
+
+val_loader = DataLoader(
+    val_ds,
+    batch_size=64,
+    num_workers=2
+)
 
 # ----------------------------
-# Improved SimpleCNN (SMALL VERSION)
+# Small Efficient CNN
 # ----------------------------
 
 class SimpleCNN(nn.Module):
@@ -63,7 +72,6 @@ class SimpleCNN(nn.Module):
             nn.MaxPool2d(2),
         )
 
-        # 🔥 Global Average Pooling (reduces parameters massively)
         self.global_pool = nn.AdaptiveAvgPool2d((1, 1))
 
         self.classifier = nn.Sequential(
@@ -82,6 +90,8 @@ class SimpleCNN(nn.Module):
 
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+print(f"Using device: {device}")
+
 model = SimpleCNN().to(device)
 
 criterion = nn.BCEWithLogitsLoss()
@@ -94,7 +104,7 @@ optimizer = optim.Adam(
 
 scheduler = optim.lr_scheduler.StepLR(
     optimizer,
-    step_size=3,
+    step_size=2,
     gamma=0.5
 )
 
@@ -102,17 +112,17 @@ scheduler = optim.lr_scheduler.StepLR(
 # MLflow Setup
 # ----------------------------
 
-mlflow.set_experiment("cats_vs_dogs_finetuned_simplecnn")
+mlflow.set_experiment("cats_vs_dogs_fast_cpu")
 
 with mlflow.start_run():
 
-    mlflow.log_param("model", "ImprovedSimpleCNN_Small")
-    mlflow.log_param("batch_size", 32)
+    mlflow.log_param("image_size", 128)
+    mlflow.log_param("batch_size", 64)
     mlflow.log_param("lr", 1e-4)
-    mlflow.log_param("epochs", 8)
+    mlflow.log_param("epochs", 5)
     mlflow.log_param("weight_decay", 1e-4)
 
-    num_epochs = 8
+    num_epochs = 5
 
     for epoch in range(num_epochs):
 
@@ -127,8 +137,8 @@ with mlflow.start_run():
             x, y = x.to(device), y.float().to(device)
 
             optimizer.zero_grad()
-            out = model(x).squeeze()
-            loss = criterion(out, y)
+            outputs = model(x).squeeze()
+            loss = criterion(outputs, y)
             loss.backward()
             optimizer.step()
 
@@ -142,8 +152,8 @@ with mlflow.start_run():
         with torch.no_grad():
             for x, y in val_loader:
                 x, y = x.to(device), y.to(device)
-                out = model(x).squeeze()
-                preds = (torch.sigmoid(out) > 0.5).long()
+                outputs = model(x).squeeze()
+                preds = (torch.sigmoid(outputs) > 0.5).long()
 
                 correct += (preds == y).sum().item()
                 total += y.size(0)
@@ -162,7 +172,7 @@ with mlflow.start_run():
         print(
             f"Train Loss: {avg_loss:.4f} | "
             f"Val Acc: {acc:.4f} | "
-            f"Time: {time.time()-start_time:.1f}s"
+            f"Time: {time.time() - start_time:.1f}s"
         )
 
     # -------- Confusion Matrix --------
@@ -173,14 +183,13 @@ with mlflow.start_run():
     plt.xlabel("Predicted")
     plt.ylabel("True")
     plt.tight_layout()
-    plt.savefig("confusion_matrix_finetuned.png")
+    plt.savefig("confusion_matrix.png")
     plt.close()
 
-    mlflow.log_artifact("confusion_matrix_finetuned.png")
+    mlflow.log_artifact("confusion_matrix.png")
 
     # -------- Save Model --------
     os.makedirs("models", exist_ok=True)
-
     torch.save(model.state_dict(), "models/baseline_cnn.pt")
     mlflow.log_artifact("models/baseline_cnn.pt")
 

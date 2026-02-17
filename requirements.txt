@@ -1,22 +1,14 @@
-torch==2.2.2
-torchvision==0.17.2
+--extra-index-url https://download.pytorch.org/whl/cpu
 
+torch==2.2.2+cpu
+torchvision==0.17.2+cpu
 fastapi==0.110.0
 uvicorn==0.27.1
-
-pillow==10.2.0
-numpy==1.26.4
-
-
-mlflow
-dvc
-
-opencv-python
+mlflow==2.11.3
+dvc==3.51.2
 scikit-learn
 matplotlib
 seaborn
-pandas
+pillow
+pytest
 python-multipart
-pytest==8.1.1
-requests==2.31.0
-
