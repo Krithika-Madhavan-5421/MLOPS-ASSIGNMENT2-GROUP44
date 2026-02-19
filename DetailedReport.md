@@ -1,4 +1,13 @@
-# Cats vs Dogs Classification: An End-to-End MLOps Pipeline
+
+---
+
+# Cats vs Dogs Classification
+
+## End-to-End Production-Grade MLOps Pipeline
+
+---
+
+## Team Details
 
 | S.No | Register Number | Name                              | Contribution |
 | ---- | --------------- | --------------------------------- | ------------ |
@@ -6,65 +15,83 @@
 | 2    | 2024aa05435     | Yarragondla Rugmangadha Reddy     | 100%         |
 | 3    | 2024aa05423     | Payel Karmakar                    | 100%         |
 | 4    | 2024aa05870     | Deepak Sindhu                     | 100%         |
-| 5    | 2024ab05227     | PARAB PRATHAMESH PRAFULLA PRADNYA | 100%         |
+| 5    | 2024ab05227     | Parab Prathamesh Prafulla Pradnya | 100%         |
 
 ---
 
-# 1. Project Overview
+# 1️. Project Overview
 
-This project implements a **complete end-to-end MLOps pipeline** for binary image classification (Cats vs Dogs) designed for a pet adoption platform.
+This project implements a **complete production-ready MLOps pipeline** for binary image classification (Cats vs Dogs).
 
-The goal is to:
+The pipeline demonstrates:
 
-* Build a reproducible ML training pipeline
-* Track experiments using MLflow
-* Containerize the inference service
-* Implement CI/CD automation
-* Deploy and monitor the model
-* Perform post-deployment performance validation
+* Reproducible data versioning (DVC)
+* Experiment tracking (MLflow)
+* Model training and artifact logging
+* Containerized inference (FastAPI + Docker)
+* CI/CD automation (GitHub Actions)
+* Deployment validation
+* Monitoring & post-deployment evaluation
 
-The dataset used is the **Kaggle Cats vs Dogs Dataset**, containing labeled RGB images of cats and dogs.
+Dataset:
 
-All images are:
+Kaggle Cats vs Dogs Dataset
 
-* Resized to 224×224
+Images are:
+
 * Converted to RGB
-* Split into train/validation/test sets (80/10/10)
-* Augmented for better generalization
-
-This project mirrors real-world ML production workflows by integrating:
-
-* Git + DVC for versioning
-* MLflow for experiment tracking
-* FastAPI for model serving
-* Docker for containerization
-* GitHub Actions for CI/CD
-* Monitoring and post-deployment evaluation
+* Resized to 224×224
+* Split into train/val/test (80/10/10)
+* Augmented for generalization
 
 ---
 
-# 2. Setup & Installation Instructions
+# 2️. System Architecture
 
-## 2.1 System Requirements
-
-* Python 3.10+
-* pip
-* Docker
-* Git
-* GitHub account
-
----
-
-## 2.2 Clone Repository
-
-```bash
-git clone https://github.com/Krithika-Madhavan-5421/MLOPS-ASSIGNMENT2-GROUP44.git
-cd cats-dogs-mlops
+```
+Raw Dataset
+      ↓
+DVC Data Pipeline
+      ↓
+Training (MLflow Tracking)
+      ↓
+Model Artifact
+      ↓
+Docker Build (CI)
+      ↓
+Docker Hub
+      ↓
+CD Deployment (Docker Compose)
+      ↓
+FastAPI Service
+      ↓
+Monitoring & Evaluation
 ```
 
 ---
 
-## 2.3 Create Virtual Environment
+# 3️. Setup Instructions
+
+## 3.1 Requirements
+
+* Python 3.10+
+* Git
+* Docker
+* DVC
+* MLflow
+
+---
+
+## 3.2 Clone Repository
+
+```bash
+git clone https://github.com/Krithika-Madhavan-5421/MLOPS-ASSIGNMENT2-GROUP44.git
+cd MLOPS-ASSIGNMENT2-GROUP44
+```
+
+---
+
+## 3.3 Create Virtual Environment
 
 ```bash
 conda create -n cats-dogs-mlops python=3.10 -y
@@ -80,7 +107,7 @@ source venv/bin/activate
 
 ---
 
-## 2.4 Install Dependencies
+## 3.4 Install Dependencies
 
 ```bash
 pip install --upgrade pip
@@ -89,40 +116,87 @@ pip install -r requirements.txt
 
 ---
 
-# 3. Data Preparation
+# 4️. Data Versioning & Reproducibility (DVC)
 
-Run:
+## 4.1 DVC Pipeline Structure
 
-```bash
-python src/data_preparation.py
+The project defines reproducible stages in `dvc.yaml`:
+
+```yaml
+stages:
+  data_preparation:
+    cmd: python src/data_preparation.py
+    deps:
+      - src/data_preparation.py
+      - data/raw
+    outs:
+      - data/processed
+
+  train:
+    cmd: python src/train.py
+    deps:
+      - src/train.py
+      - data/processed
+    outs:
+      - models/model.pth
 ```
-
-This step:
-
-* Loads raw Kaggle dataset
-* Removes corrupt images
-* Resizes images to 224×224
-* Splits into train/val/test
-* Saves processed dataset under `data/processed/`
-
-Dataset versioning is managed using **DVC**.
 
 ---
 
-# 4. Model Development & Experiment Tracking (M1)
+## 4.2 Running Full Pipeline
 
-## 4.1 Baseline Model
+To reproduce the entire pipeline:
 
-A Simple CNN was implemented as the baseline model:
+```bash
+dvc repro
+```
 
-* 3 convolutional blocks
+This will:
+
+* Run data preprocessing
+* Train model
+* Regenerate artifacts if dependencies changed
+
+---
+
+## 4.3 Pulling Artifacts from Remote
+
+If DVC remote is configured:
+
+```bash
+dvc pull
+```
+
+Restores:
+
+* Processed dataset
+* Model weights
+
+---
+
+## Why DVC?
+
+* Large data not stored in Git
+* Reproducible training
+* Controlled dataset versioning
+* Automatic dependency tracking
+
+---
+
+# 5️. Model Development & Experiment Tracking
+
+## 5.1 Baseline CNN Model
+
+Architecture:
+
+* 3 Conv blocks
 * Batch Normalization
-* ReLU activation
+* ReLU
 * MaxPooling
 * Global Average Pooling
-* Fully connected classifier
+* Fully connected output
 
-Binary classification using:
+Loss Function:
 
 ```
 BCEWithLogitsLoss
@@ -130,35 +204,32 @@ BCEWithLogitsLoss
 
 ---
 
-## 4.2 Training
-
-Run:
+## 5.2 Training
 
 ```bash
 python src/train.py
 ```
 
-Training includes:
+Includes:
 
 * Data augmentation
-* Weight decay regularization
 * Learning rate scheduler
-* MLflow logging
+* Weight decay
+* MLflow experiment logging
 
 ---
 
-## 4.3 MLflow Experiment Tracking
+## 5.3 MLflow Tracking
 
 MLflow logs:
 
-* Parameters
-* Training loss
+* Hyperparameters
+* Loss curves
 * Validation accuracy
 * Confusion matrix
-* Serialized model
-* PyTorch model artifact
+* Model artifacts
 
-Launch MLflow UI:
+Launch UI:
 
 ```bash
 mlflow ui
@@ -170,17 +241,23 @@ Access:
 http://localhost:5000
 ```
 
+![MLFlow1.jpg](screenshots/MLFlow1.jpg)
+![MLFlow2.jpg](screenshots/MLFlow2.jpg)
+![MLFlow3.jpg](screenshots/MLFlow3.jpg)
+![MLFlow4.jpg](screenshots/MLFlow4.jpg)
 ---
 
-# 5. Model Packaging & Containerization (M2)
+# 6️. Model Serving & Dockerization
 
-## 5.1 FastAPI Inference Service
+## 6.1 FastAPI Inference Service
 
 Endpoints:
 
-* `GET /health`
-* `POST /predict`
-* `GET /metrics`
+| Endpoint   | Purpose              |
+| ---------- | -------------------- |
+| `/health`  | Health check         |
+| `/predict` | Image classification |
+| `/metrics` | Runtime metrics      |
 
 Run locally:
 
@@ -188,189 +265,177 @@ Run locally:
 uvicorn src.inference_app:app --host 0.0.0.0 --port 8000
 ```
 
-Swagger UI:
+Swagger:
 
 ```
 http://localhost:8000/docs
 ```
 
----
-
-## 5.2 Dockerization
-
-Build image:
-
-```bash
-docker build -t cats-dogs-inference:latest .
-```
-
-Run container:
-
-```bash
-docker run -p 8000:8000 cats-dogs-inference:latest
-```
-
-Image is pushed to Docker Hub via CI.
+![Swagger1.jpg](screenshots/Swagger1.jpg)
 
 ---
 
-# 6. CI Pipeline (M3)
+## 6.2 Docker Build
 
-Implemented using **GitHub Actions**.
+```bash
+docker build -t <dockerhub-username>/cats-dogs-inference:latest .
+```
+
+Run:
+
+```bash
+docker run -p 8000:8000 <dockerhub-username>/cats-dogs-inference:latest
+```
+
+---
+
+# 7️. Docker Hub Integration
+
+## Manual Push
+
+```bash
+docker login
+docker push <dockerhub-username>/cats-dogs-inference:latest
+```
+![Dockerhub1.jpg](screenshots/Dockerhub1.jpg)
+---
+
+## GitHub Secrets Required
+
+Add in repository settings:
+
+* `DOCKER_USERNAME`
+* `DOCKER_PASSWORD`
+
+---
+
+## CI Docker Push Workflow
+
+```yaml
+- name: Login to Docker Hub
+  run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
+
+- name: Build Image
+  run: docker build -t ${{ secrets.DOCKER_USERNAME }}/cats-dogs-inference:latest .
+
+- name: Push Image
+  run: docker push ${{ secrets.DOCKER_USERNAME }}/cats-dogs-inference:latest
+```
+
+---
+
+# 8️. Continuous Integration (CI)
 
 Triggered on push.
 
-Pipeline steps:
+Pipeline:
 
-1. Checkout code
-2. Install dependencies
-3. Run unit tests (pytest)
-4. Build Docker image
-5. Push image to Docker Hub
+1. Install dependencies
+2. Run pytest unit tests
+3. Build Docker image
+4. Push image to Docker Hub
 
-Unit tests include:
-
-* Preprocessing function test
-* Inference utility test
-
+![ci1.jpg](screenshots/ci1.jpg)
 ---
 
-# 7. CD Pipeline & Deployment (M4)
+# 9️. Continuous Deployment (CD)
 
-Deployment uses Docker Compose.
+Deployment via Docker Compose.
 
-On successful CI:
+Example:
 
-* Pull latest image
-* Start container
-* Run smoke tests:
+```yaml
+version: "3.8"
+services:
+  inference:
+    image: <dockerhub-username>/cats-dogs-inference:latest
+    ports:
+      - "8000:8000"
+    restart: always
+```
 
-  * `/health`
-  * `/predict`
-* Fail pipeline if smoke test fails
+Deploy:
 
+```bash
+docker compose pull
+docker compose up -d
+```
+
+Smoke tests:
+
+* `/health`
+* `/predict`
+
+Fail deployment if tests fail.
+
+![cd1.jpg](screenshots/cd1.jpg)
 ---
 
-# 8. Monitoring & Post-Deployment Evaluation (M5)
+# 10. Monitoring & Post-Deployment Evaluation
 
-## 8.1 Logging & Metrics
+## Runtime Metrics
 
-Inference service logs:
-
-* Request count
-* Prediction probability
-* Predicted label
-* Latency
-
-Metrics endpoint:
-
-```
-GET /metrics
-```
-
-Returns:
+`GET /metrics` returns:
 
 * Total requests
 * Average latency
+* Prediction count
 
 ---
 
-## 8.2 Post-Deployment Evaluation
+## Post-Deployment Accuracy Validation
 
-Separate workflow performs:
+Separate workflow:
 
-* Calls `/predict` with labeled test images
+* Sends labeled test data
 * Computes accuracy
 * Enforces threshold
-* Fails workflow if below threshold
+* Fails if below threshold
 
-Monitoring pipeline now reports:
+Example output:
 
 ```
 Post-deployment accuracy: 1.0
 ```
 
+![model-monitoring1.jpg](screenshots/model-monitoring1.jpg)
 ---
 
-# 9. Architecture Overview
+# 1️1️. Engineering Decisions
 
-```
-Raw Data
-   ↓
-Data Preparation (DVC)
-   ↓
-Training (MLflow)
-   ↓
-Model Artifact
-   ↓
-Docker Build (CI)
-   ↓
-Docker Hub
-   ↓
-CD Deploy (Docker Compose)
-   ↓
-FastAPI Service
-   ↓
-Monitoring & Evaluation
-```
+* Global Average Pooling reduces parameters
+* DVC ensures reproducibility
+* MLflow enables experiment tracking
+* Docker ensures portability
+* CI/CD ensures automation
+* Lazy model loading for performance
+* Separate monitoring workflow
 
 ---
 
-# 10. CI/CD Workflow Summary
+# 1️2️. Repository
 
-### CI:
-
-* Automated testing
-* Docker build
-* Image push
-
-### CD:
-
-* Auto deployment
-* Smoke testing
-
-### Monitoring:
-
-* Request logs
-* Latency tracking
-* Accuracy validation
+🔗
+[https://github.com/Krithika-Madhavan-5421/MLOPS-ASSIGNMENT2-GROUP44](https://github.com/Krithika-Madhavan-5421/MLOPS-ASSIGNMENT2-GROUP44)
 
 ---
 
-# 11. Key Design Decisions
+# 1️3️. Conclusion
 
-* Global Average Pooling to reduce model size
-* Models not stored in Git (size compliance)
-* Lazy model loading in inference
-* Architecture consistency between train and inference
-* Separation of deployment and monitoring pipelines
-
----
-
-# 12. Code Repository
-
-🔗 [https://github.com/Krithika-Madhavan-5421/MLOPS-ASSIGNMENT2-GROUP44](https://github.com/Krithika-Madhavan-5421/MLOPS-ASSIGNMENT2-GROUP44)
-
----
-
-# 13. Conclusion
-
-This project demonstrates a complete industrial-grade MLOps pipeline:
+This project demonstrates a complete industrial-grade ML lifecycle including:
 
 * Reproducible training
-* Experiment tracking
+* Experiment management
 * Containerized inference
 * Automated CI/CD
-* Post-deployment monitoring
-* Performance validation
+* Monitoring & validation
 
-The pipeline follows production best practices and ensures:
+It reflects production MLOps best practices and ensures:
 
 * Scalability
-* Reproducibility
 * Automation
+* Reliability
 * Deployment readiness
-
-It mirrors real-world ML system design used in production environments.
+* Performance validation
 
 ---

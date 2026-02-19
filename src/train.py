@@ -12,44 +12,9 @@ import seaborn as sns
 import time
 import os
 
+
 DATA_DIR = "data/processed"
 
-# ----------------------------
-# Faster Transforms (128x128)
-# ----------------------------
-
-transform_train = T.Compose([
-    T.Resize((128, 128)),
-    T.RandomHorizontalFlip(),
-    T.ToTensor(),
-    T.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5])
-])
-
-transform_val = T.Compose([
-    T.Resize((128, 128)),
-    T.ToTensor(),
-    T.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5])
-])
-
-train_ds = ImageFolder(f"{DATA_DIR}/train", transform=transform_train)
-val_ds   = ImageFolder(f"{DATA_DIR}/val", transform=transform_val)
-
-train_loader = DataLoader(
-    train_ds,
-    batch_size=64,
-    shuffle=True,
-    num_workers=2
-)
-
-val_loader = DataLoader(
-    val_ds,
-    batch_size=64,
-    num_workers=2
-)
-
-# ----------------------------
-# Small Efficient CNN
-# ----------------------------
 
 class SimpleCNN(nn.Module):
     def __init__(self):
@@ -89,110 +54,149 @@ class SimpleCNN(nn.Module):
         return x
 
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-print(f"Using device: {device}")
+def main():
 
-model = SimpleCNN().to(device)
+    # ----------------------------
+    # Transforms
+    # ----------------------------
 
-criterion = nn.BCEWithLogitsLoss()
+    transform_train = T.Compose([
+        T.Resize((128, 128)),
+        T.RandomHorizontalFlip(),
+        T.ToTensor(),
+        T.Normalize([0.5]*3, [0.5]*3)
+    ])
 
-optimizer = optim.Adam(
-    model.parameters(),
-    lr=1e-4,
-    weight_decay=1e-4
-)
+    transform_val = T.Compose([
+        T.Resize((128, 128)),
+        T.ToTensor(),
+        T.Normalize([0.5]*3, [0.5]*3)
+    ])
 
-scheduler = optim.lr_scheduler.StepLR(
-    optimizer,
-    step_size=2,
-    gamma=0.5
-)
+    train_ds = ImageFolder(f"{DATA_DIR}/train", transform=transform_train)
+    val_ds = ImageFolder(f"{DATA_DIR}/val", transform=transform_val)
 
-# ----------------------------
-# MLflow Setup
-# ----------------------------
+    train_loader = DataLoader(
+        train_ds,
+        batch_size=64,
+        shuffle=True,
+        num_workers=2
+    )
 
-mlflow.set_experiment("cats_vs_dogs_fast_cpu")
+    val_loader = DataLoader(
+        val_ds,
+        batch_size=64,
+        num_workers=2
+    )
 
-with mlflow.start_run():
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(f"Using device: {device}")
 
-    mlflow.log_param("image_size", 128)
-    mlflow.log_param("batch_size", 64)
-    mlflow.log_param("lr", 1e-4)
-    mlflow.log_param("epochs", 5)
-    mlflow.log_param("weight_decay", 1e-4)
+    model = SimpleCNN().to(device)
 
-    num_epochs = 5
+    criterion = nn.BCEWithLogitsLoss()
 
-    for epoch in range(num_epochs):
+    optimizer = optim.Adam(
+        model.parameters(),
+        lr=1e-4,
+        weight_decay=1e-4
+    )
 
-        print(f"\nEpoch {epoch+1}/{num_epochs}")
-        start_time = time.time()
+    scheduler = optim.lr_scheduler.StepLR(
+        optimizer,
+        step_size=2,
+        gamma=0.5
+    )
 
-        # -------- Training --------
-        model.train()
-        train_loss = 0.0
+    # ----------------------------
+    # MLflow Setup
+    # ----------------------------
 
-        for x, y in train_loader:
-            x, y = x.to(device), y.float().to(device)
+    mlflow.set_experiment("cats_vs_dogs_experiment")
 
-            optimizer.zero_grad()
-            outputs = model(x).squeeze()
-            loss = criterion(outputs, y)
-            loss.backward()
-            optimizer.step()
+    with mlflow.start_run():
 
-            train_loss += loss.item()
+        mlflow.log_param("image_size", 128)
+        mlflow.log_param("batch_size", 64)
+        mlflow.log_param("lr", 1e-4)
+        mlflow.log_param("epochs", 5)
+        mlflow.log_param("weight_decay", 1e-4)
 
-        # -------- Validation --------
-        model.eval()
-        correct, total = 0, 0
-        all_preds, all_gt = [], []
+        num_epochs = 5
 
-        with torch.no_grad():
-            for x, y in val_loader:
-                x, y = x.to(device), y.to(device)
+        for epoch in range(num_epochs):
+
+            print(f"\nEpoch {epoch+1}/{num_epochs}")
+            start_time = time.time()
+
+            # -------- Training --------
+            model.train()
+            train_loss = 0.0
+
+            for x, y in train_loader:
+                x, y = x.to(device), y.float().to(device)
+
+                optimizer.zero_grad()
                 outputs = model(x).squeeze()
-                preds = (torch.sigmoid(outputs) > 0.5).long()
+                loss = criterion(outputs, y)
+                loss.backward()
+                optimizer.step()
 
-                correct += (preds == y).sum().item()
-                total += y.size(0)
+                train_loss += loss.item()
 
-                all_preds.extend(preds.cpu().numpy())
-                all_gt.extend(y.cpu().numpy())
+            # -------- Validation --------
+            model.eval()
+            correct, total = 0, 0
+            all_preds, all_gt = [], []
 
-        acc = correct / total
-        avg_loss = train_loss / len(train_loader)
+            with torch.no_grad():
+                for x, y in val_loader:
+                    x, y = x.to(device), y.to(device)
+                    outputs = model(x).squeeze()
+                    preds = (torch.sigmoid(outputs) > 0.5).long()
 
-        mlflow.log_metric("train_loss", avg_loss, step=epoch)
-        mlflow.log_metric("val_accuracy", acc, step=epoch)
+                    correct += (preds == y).sum().item()
+                    total += y.size(0)
 
-        scheduler.step()
+                    all_preds.extend(preds.cpu().numpy())
+                    all_gt.extend(y.cpu().numpy())
 
-        print(
-            f"Train Loss: {avg_loss:.4f} | "
-            f"Val Acc: {acc:.4f} | "
-            f"Time: {time.time() - start_time:.1f}s"
-        )
+            acc = correct / total
+            avg_loss = train_loss / len(train_loader)
 
-    # -------- Confusion Matrix --------
-    cm = confusion_matrix(all_gt, all_preds)
+            mlflow.log_metric("train_loss", avg_loss, step=epoch)
+            mlflow.log_metric("val_accuracy", acc, step=epoch)
 
-    plt.figure(figsize=(4, 4))
-    sns.heatmap(cm, annot=True, fmt="d")
-    plt.xlabel("Predicted")
-    plt.ylabel("True")
-    plt.tight_layout()
-    plt.savefig("confusion_matrix.png")
-    plt.close()
+            scheduler.step()
 
-    mlflow.log_artifact("confusion_matrix.png")
+            print(
+                f"Train Loss: {avg_loss:.4f} | "
+                f"Val Acc: {acc:.4f} | "
+                f"Time: {time.time() - start_time:.1f}s"
+            )
 
-    # -------- Save Model --------
-    os.makedirs("models", exist_ok=True)
-    torch.save(model.state_dict(), "models/baseline_cnn.pt")
-    mlflow.log_artifact("models/baseline_cnn.pt")
+        # -------- Confusion Matrix --------
+        cm = confusion_matrix(all_gt, all_preds)
 
-    mlflow.pytorch.log_model(model, "model")
+        plt.figure(figsize=(4, 4))
+        sns.heatmap(cm, annot=True, fmt="d")
+        plt.xlabel("Predicted")
+        plt.ylabel("True")
+        plt.tight_layout()
+        plt.savefig("confusion_matrix.png")
+        plt.close()
 
-print("Training complete.")
+        mlflow.log_artifact("confusion_matrix.png")
+
+        # -------- Save Model --------
+        os.makedirs("models", exist_ok=True)
+        torch.save(model.state_dict(), "models/baseline_cnn.pt")
+        mlflow.log_artifact("models/baseline_cnn.pt")
+
+        mlflow.pytorch.log_model(model, "model")
+
+    print("Training complete.")
+
+
+if __name__ == "__main__":
+    main()
